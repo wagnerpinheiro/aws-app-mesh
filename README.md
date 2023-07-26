@@ -168,13 +168,13 @@ kubectl get crds | grep appmesh
 Primeiramente, precisamos afiliar a aplicação que está rodando no EKS com o Mesh que criamos anteriormente. Isso é feito adicionando um rótulo do mesh ao namespace do aplicativo.
 
 ```
-kubectl label namespace appmesh-workshop-ns mesh=app-mesh
+kubectl label namespace lab-appmesh mesh=app-mesh
 ```
 
 Neste ponto, também configuraremos o App Mesh Controller para injetar automaticamente os contêineres de proxy secundário do Envoy em nossos pods de aplicativo neste namespace. Isso é feito adicionando uma segunda label ao namespace.
 
 ```
-kubectl label namespace appmesh-workshop-ns appmesh.k8s.aws/sidecarInjectorWebhook=enabled
+kubectl label namespace lab-appmesh appmesh.k8s.aws/sidecarInjectorWebhook=enabled
 ```
 
 ## Criação do mesh através do cluster k8s
@@ -211,7 +211,7 @@ Então podemos dizer que:
 Para conseguir buscar o valor do hostname, basta executar o seguinte comando:
 
 ```
-kubectl get service nodejs-app-service -n appmesh-workshop-ns -o json | jq -r '.status.loadBalancer.ingress[].hostname'
+kubectl get service nodejs-app-service -n lab-appmesh -o json | jq -r '.status.loadBalancer.ingress[].hostname'
 ```
 
 ```
@@ -219,7 +219,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualNode
 metadata:
   name: nodejs-app
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   podSelector:
     matchLabels:
@@ -245,7 +245,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualService
 metadata:
   name: nodejs
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   awsName: nodejs.appmeshworkshop.hosted.local
   provider:
@@ -265,7 +265,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualRouter
 metadata:
   name: nodejs-router
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   listeners:
     - portMapping:
@@ -286,19 +286,19 @@ spec:
 Nós conseguimos configurar os recursos necessários para que os novos pods subam com o container adicional do Envoy, entretanto, será necessário o restart dos pods que o novo container seja atribuido a eles. 
 
 ```
-kubectl -n appmesh-workshop-ns rollout restart deployment nodejs-app
+kubectl -n lab-appmesh rollout restart deployment nodejs-app
 ```
 
 Agora vamos validar quais containers nós temos rodando dentro do nossos pods.
 
 ```
-kubectl -n appmesh-workshop-ns get pods ${POD} -o jsonpath='{.spec.containers[*].name}';
+kubectl -n lab-appmesh get pods ${POD} -o jsonpath='{.spec.containers[*].name}';
 ```
 
 Para auxiliar na análise podemos avaliar os logs de cada container dentro do pod com o seguinte comando, podemos ver se os logs do envoy estão com algum problema.
 
 ```
-kubectl logs ${POD} -n appmesh-workshop-ns -c envoy
+kubectl logs ${POD} -n lab-appmesh -c envoy
 ```
 
 Vamos avaliar novamente o retorno de uma chamada curl, agora a resposta não será diretamente da nossa aplicação e sim da camada de proxy (envoy) que adicionamos.
@@ -306,7 +306,7 @@ Vamos avaliar novamente o retorno de uma chamada curl, agora a resposta não ser
 Vamos acessar diretamente um pod para conseguir executar o comando abaixo e analisar o retorno dessa chamada. 
 
 ```
-kubectl exec -it ${POD} -n appmesh-workshop-ns -- /bin/bash
+kubectl exec -it ${POD} -n lab-appmesh -- /bin/bash
 curl -v http://nodejs.appmeshworkshop.hosted.local:3000/
 ```
 
@@ -343,19 +343,19 @@ Restart a aplicação para que o container x-ray-daemon suba no pod
 
 obs.: Incluir em todas as aplicações nodejs-app, crystal e frontend. 
 ```
-kubectl -n appmesh-workshop-ns rollout restart deployment nodejs-app
+kubectl -n lab-appmesh rollout restart deployment nodejs-app
 ```
 
 Validar quais containers estão rodando dentro do POD
 
 ```
-kubectl -n appmesh-workshop-ns get pods ${POD} -o jsonpath='{.spec.containers[*].name}'
+kubectl -n lab-appmesh get pods ${POD} -o jsonpath='{.spec.containers[*].name}'
 ```
 
 Para auxiliar na análise podemos avaliar os logs de cada container dentro do pod com o seguinte comando, podemos ver se os logs do xray-daemon estão com algum problema.
 
 ```
- kubectl logs ${POD} -n appmesh-workshop-ns -c xray-daemon
+ kubectl logs ${POD} -n lab-appmesh -c xray-daemon
 ```
 Vamos validar no painel como está o trace do X-ray que está recebendo informações do Envoy enquanto as requisições são realizadas.
 
@@ -377,7 +377,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualNode
 metadata:
   name: nodejs-app
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   podSelector:
     matchLabels:
@@ -396,7 +396,7 @@ spec:
 Listar os Ipds dos Pods para bater com os IPs do AWS Cloud Map.
 
 ```
-kubectl get pods -n appmesh-workshop-ns -o wide
+kubectl get pods -n lab-appmesh -o wide
 ```
 
 Vamos avaliar se os mesmos IPs estão sendo listados no cloudMap? Vamos avaliar diretamente pelo painel.
@@ -412,7 +412,7 @@ metadata:
   name: nodejs-app
   labels:
     app: nodejs-app
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   replicas: 4
   selector:
@@ -452,7 +452,7 @@ Para esse cenário, nós temos o **Virtual Gateway**!
 Primeiro passo vamos incluir uma label na nossa namespace do kubernetes, essa label será utilizada pelo Virtual Gateway. 
 
 ```
-kubectl label namespace appmesh-workshop-ns gateway=ingress-gw
+kubectl label namespace lab-appmesh gateway=ingress-gw
 ```
 
 
@@ -465,7 +465,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ingress-gw
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-internal: (http://service.beta.kubernetes.io/aws-load-balancer-internal:) "true"
@@ -482,7 +482,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ingress-gw
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   replicas: 2
   selector:
@@ -503,7 +503,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualGateway
 metadata:
   name: ingress-gw
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   namespaceSelector:
     matchLabels:
@@ -520,7 +520,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: GatewayRoute
 metadata:
   name: gateway-route-eks
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   httpRoute:
     match:
@@ -564,7 +564,7 @@ metadata:
   name: nodejsv2-app
   labels:
     app: nodejsv2-app
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   replicas: 3
   selector:
@@ -596,7 +596,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualNode
 metadata:
   name: nodejsv2-app
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   podSelector:
     matchLabels:
@@ -618,7 +618,7 @@ apiVersion: appmesh.k8s.aws/v1beta2
 kind: VirtualRouter
 metadata:
   name: nodejs-router
-  namespace: appmesh-workshop-ns
+  namespace: lab-appmesh
 spec:
   listeners:
     - portMapping:
